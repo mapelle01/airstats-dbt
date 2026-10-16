@@ -1,0 +1,110 @@
+version: 2
+
+models:
+  - name: silver_airports
+    description: "One row per airport worldwide, with cleaned and renamed columns."
+    columns:
+      - name: airport_ident
+        description: '{{ doc("airport_ident") }}'
+        data_tests:
+          - unique
+          - not_null
+      - name: airport_type
+        description: "Type of airport, e.g. heliport, small_airport or closed."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - balloonport
+                  - closed
+                  - heliport
+                  - large_airport
+                  - medium_airport
+                  - seaplane_base
+                  - small_airport
+      - name: airport_name
+        description: "Official name of the airport."
+      - name: airport_lat
+        description: "Latitude in decimal degrees."
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -90
+                max_value: 90
+      - name: airport_long
+        description: "Longitude in decimal degrees."
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -180
+                max_value: 180
+      - name: continent
+        description: "Continent code where the airport is located."
+      - name: iso_country
+        description: "ISO country code of the airport."
+      - name: iso_region
+        description: "ISO region code of the airport."
+
+  - name: silver_runways
+    description: "One row per runway. Missing surfaces are replaced by __UNKNOWN__."
+    columns:
+      - name: runway_id
+        description: "Unique identifier of the runway."
+        data_tests:
+          - unique
+          - not_null
+      - name: airport_ident
+        description: '{{ doc("airport_ident") }}'
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_airports')
+                field: airport_ident
+              config:
+                severity: warn
+      - name: runway_length_ft
+        description: "Runway length in feet."
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+      - name: runway_width_ft
+        description: "Runway width in feet."
+      - name: runway_surface
+        description: "Runway surface type, or __UNKNOWN__ when it is not informed."
+      - name: runway_lighted
+        description: "1 if the runway is lighted, 0 otherwise."
+      - name: runway_closed
+        description: "1 if the runway is closed, 0 otherwise."
+
+  - name: silver_airport_comments
+    description: "User comments about airports. Incremental: only new comment_id values are added on each run."
+    columns:
+      - name: comment_id
+        description: "Unique identifier of the comment."
+        data_tests:
+          - unique
+          - not_null
+      - name: airport_ident
+        description: '{{ doc("airport_ident") }}'
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('silver_airports')
+                field: airport_ident
+              config:
+                severity: warn
+      - name: comment_timestamp
+        description: "Date and time when the comment was written."
+      - name: member_nickname
+        description: "Nickname of the author, or __UNKNOWN__ when missing."
+      - name: comment_subject
+        description: "Subject line of the comment."
+      - name: comment_body
+        description: "Text of the comment. Empty comments are filtered out."
+        data_tests:
+          - not_null
+      - name: loaded_at
+        description: "Timestamp when the row was loaded into the silver table."
